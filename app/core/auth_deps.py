@@ -1,12 +1,13 @@
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer # Standard way to define token location
-from pydantic import BaseModel, EmailStr
+from fastapi.security import OAuth2PasswordBearer
+from pydantic import BaseModel, EmailStr, Field # Added Field
 import jwt # PyJWT or python-jose. Supabase uses standard JWTs.
-from typing import Optional
+from typing import Optional, Dict, Any # Added Dict, Any
 import uuid
 
 from app.core import get_supabase_client, settings # For Supabase client and potentially JWT secret/config
 from supabase import Client
+from supabase.lib.client_options import ClientOptions # Required for user_metadata access with some versions
 
 
 # This scheme can be used in swagger UI to make it easy to add the token
@@ -15,49 +16,39 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login
 class AuthenticatedUser(BaseModel):
     id: uuid.UUID
     email: Optional[EmailStr] = None
-    # Add other fields from JWT if needed, like 'role'
-    # role: Optional[str] = None
+    # Add user_metadata to potentially access roles or other custom claims
+    user_metadata: Dict[str, Any] = Field(default_factory=dict)
+    # role: Optional[str] = None # Could be extracted from user_metadata
 
 async def get_current_authenticated_user(
     token: str = Depends(oauth2_scheme),
     supabase: Client = Depends(get_supabase_client)
 ) -> AuthenticatedUser:
-    '''
-    Dependency to get the current authenticated user from a Supabase JWT.
-    This is a placeholder for full JWT validation.
-    '''
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    if not token: # Should be caught by oauth2_scheme, but as a safeguard
+    if not token:
         raise credentials_exception
 
     try:
-        # In a real scenario, you would validate the Supabase JWT.
-        # This typically involves:
-        # 1. Fetching Supabase's JWKS (JSON Web Key Set) URI.
-        # 2. Decoding the token using the correct public key from JWKS.
-        # 3. Verifying signature, issuer (iss), audience (aud), expiry (exp).
-        # Supabase-py's `auth.get_user(jwt=token)` does this.
-
+        # supabase.auth.get_user(jwt=token) validates the token and returns user details
         user_response = supabase.auth.get_user(jwt=token)
 
         if user_response.user:
-            # print(f"Authenticated user from token: {user_response.user.id}, email: {user_response.user.email}")
+            # print(f"Authenticated user from token: {user_response.user.id}, email: {user_response.user.email}, metadata: {user_response.user.user_metadata}")
             return AuthenticatedUser(
-                id=user_response.user.id, # This is a UUID
-                email=user_response.user.email
-                # role=user_response.user.role # If you have roles in your Supabase user
+                id=user_response.user.id,
+                email=user_response.user.email,
+                user_metadata=user_response.user.user_metadata or {} # Ensure user_metadata is a dict
             )
         else:
-            # This case might occur if token is valid but user somehow doesn't exist or other error
             print("Token seemed valid but no user data returned by supabase.auth.get_user()")
             raise credentials_exception
 
-    except jwt.ExpiredSignatureError: # If using PyJWT directly
+    except jwt.ExpiredSignatureError: # If using PyJWT directly (supabase-py might raise its own error type)
         print("Token has expired.")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -67,10 +58,34 @@ async def get_current_authenticated_user(
     except jwt.PyJWTError as e: # Catch other PyJWT errors if using PyJWT directly
         print(f"JWT validation error: {e}")
         raise credentials_exception
-    except Exception as e:
-        # Catch-all for other errors, including issues with supabase.auth.get_user() if it fails unexpectedly
-        print(f"An unexpected error occurred during token validation: {e}")
-        raise credentials_exception
+    except Exception as e: # Catch-all for other errors from supabase.auth.get_user()
+        print(f"An unexpected error occurred during token validation: {str(e)}")
+        # Check if the error message indicates an invalid token specifically
+        if "invalid JWT" in str(e).lower() or "token is invalid" in str(e).lower():
+             raise credentials_exception
+        # For other unexpected errors from supabase client during auth, a 500 might be more appropriate
+        # or log it and still return 401 for security.
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected error occurred processing authentication: {str(e)}"
+        )
 
-# Placeholder for a similar dependency for "doctors" if they have specific roles/claims
-# async def get_current_authenticated_doctor(...) -> AuthenticatedDoctor: ...
+
+async def get_current_authenticated_doctor(
+    current_user: AuthenticatedUser = Depends(get_current_authenticated_user)
+) -> AuthenticatedUser:
+    '''
+    Dependency to get the current authenticated user and verify they have 'doctor' role.
+    Assumes role is stored in user.user_metadata.role.
+    '''
+    # print(f"Checking doctor role for user: {current_user.id}. Metadata: {current_user.user_metadata}")
+    user_role = current_user.user_metadata.get("role")
+
+    if user_role == "doctor":
+        return current_user # User is authenticated and has 'doctor' role
+    else:
+        print(f"User {current_user.id} does not have 'doctor' role. Actual role: '{user_role}'. Access forbidden.")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User does not have doctor privileges."
+        )

@@ -132,6 +132,17 @@ Authorization: Bearer <TU_ACCESS_TOKEN_DE_SUPABASE>
 
 La interfaz de `/docs` (Swagger UI) tiene un botón "Authorize" en la parte superior derecha donde puedes ingresar el token (incluyendo `Bearer `) para probar los endpoints protegidos directamente desde la documentación.
 
+### Autorización de Roles (Médicos)
+
+Los endpoints específicos para médicos (bajo `/api/v1/doctors/me/...`) requieren que el usuario autenticado no solo tenga un token JWT válido, sino que también posea el rol de "doctor".
+Se asume que este rol está configurado en Supabase dentro de los `user_metadata` del usuario. Por ejemplo:
+```json
+{
+  "role": "doctor"
+}
+```
+Si un usuario autenticado intenta acceder a estos endpoints sin el rol de "doctor", recibirá un error `403 Forbidden`.
+
 ## Estructura del Proyecto (Backend)
 
 ```
@@ -177,10 +188,11 @@ La interfaz de `/docs` (Swagger UI) tiene un botón "Authorize" en la parte supe
     -   [X] Base de datos de ejercicios (`exercises`) integrada con los servicios.
     -   [X] Servicios refactorizados para usar datos de Supabase en la preparación de prompts.
 -   [X] **Autenticación JWT**: Implementado un sistema de dependencias para validar JWT de Supabase y proteger endpoints.
--   [ ] **Refinar Autorización**:
-    -   Implementar lógica para asegurar que solo los médicos puedan añadir/modificar información médica.
-    -   Asegurar que los usuarios solo puedan acceder/modificar sus propios datos (ej. perfil, solicitar rutina).
-    -   Actualizar todos los endpoints que toman `user_id` o `doctor_id` del path para usar el ID del token autenticado (ej. `/users/me/profile` en lugar de `/users/{user_id}/profile`).
+-   [X] **Refinar Autorización y Estandarizar Endpoints**:
+    -   [X] Endpoints de usuario actualizados a `/me/` (ej. `/users/me/profile`, `/users/me/generate-routine`) usando el ID del token JWT.
+    -   [X] Implementada dependencia `get_current_authenticated_doctor` que verifica el rol 'doctor' en `user_metadata` del JWT.
+    -   [X] Endpoints de médico actualizados a `/doctors/me/...` y protegidos por la dependencia de rol de doctor.
+    -   [ ] Implementar lógica más granular si es necesaria (ej. un médico solo puede ver pacientes asignados - requiere diseño adicional).
 -   [ ] **Poblar la Base de Datos de Ejercicios**: Añadir un conjunto inicial y diverso de ejercicios en Supabase.
 -   [ ] Desarrollar tests unitarios e de integración.
 -   [ ] Añadir manejo de errores más robusto y validaciones detalladas.
