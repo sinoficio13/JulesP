@@ -4,8 +4,14 @@ import uuid
 
 # Assuming models are in app.models
 from app.models.user import User # Import User model
-from app.models.routine import FullRoutineDetail # For future routine generation endpoint
+# from app.models.routine import FullRoutineDetail # For future routine generation endpoint # Keep FullRoutineDetail for the new endpoint
 from pydantic import BaseModel # Added for UserPreferencesUpdate
+
+# New imports for services and FullRoutineDetail model
+from app.services.prompt_service import PromptPreparationService
+from app.services.gemini_service import GeminiService
+from app.services.routine_service import RoutineAssemblyService
+from app.models.routine import FullRoutineDetail # Ensure this is imported
 
 router = APIRouter(
     prefix="/users",
@@ -100,3 +106,52 @@ async def get_user_preferences(
 #     # This will orchestrate calls to PromptPreparationService, GeminiService, and RoutineAssemblyService
 #     # For now, returning a placeholder
 #     raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Routine generation not yet implemented.")
+
+
+@router.post("/{user_id}/generate-routine", response_model=FullRoutineDetail)
+async def generate_user_routine(
+    user_id: uuid.UUID,
+    # current_user: User = Depends(get_current_user) # Placeholder for auth
+    # Instantiate services here or use dependency injection if set up
+    prompt_service: PromptPreparationService = Depends(PromptPreparationService),
+    gemini_service: GeminiService = Depends(GeminiService),
+    routine_assembly_service: RoutineAssemblyService = Depends(RoutineAssemblyService)
+):
+    '''
+    Generates a personalized gym routine for the user.
+    Orchestrates calls to PromptPreparationService, GeminiService, and RoutineAssemblyService.
+    '''
+    print(f"User {user_id}: Received request to generate routine.")
+
+    # 1. Prepare the prompt for the Gemini API
+    try:
+        print(f"User {user_id}: Preparing prompt...")
+        gemini_prompt = await prompt_service.prepare_gemini_prompt(user_id)
+    except ValueError as e: # Or more specific exceptions
+        print(f"Error preparing prompt for user {user_id}: {e}")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) # e.g., if user data not found
+    except Exception as e:
+        print(f"Unexpected error preparing prompt for user {user_id}: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error preparing data for routine generation.")
+
+    # 2. Send the prompt to the Gemini API to get the routine structure
+    try:
+        print(f"User {user_id}: Sending prompt to Gemini Service...")
+        ai_generated_routine = await gemini_service.generate_routine(gemini_prompt)
+    except ValueError as e: # Or more specific exceptions from Gemini service
+        print(f"Error generating routine from Gemini for user {user_id}: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+    except Exception as e:
+        print(f"Unexpected error generating routine from Gemini for user {user_id}: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error generating routine from AI service.")
+
+    # 3. Assemble the full routine details by enriching with DB data
+    try:
+        print(f"User {user_id}: Assembling full routine details...")
+        full_routine_details = await routine_assembly_service.assemble_full_routine(user_id, ai_generated_routine)
+    except Exception as e:
+        print(f"Unexpected error assembling full routine for user {user_id}: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error finalizing routine details.")
+
+    print(f"User {user_id}: Routine generation complete. Returning full details.")
+    return full_routine_details
