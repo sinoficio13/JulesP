@@ -11,7 +11,7 @@ from supabase.lib.client_options import ClientOptions # Required for user_metada
 
 
 # This scheme can be used in swagger UI to make it easy to add the token
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login") # Keep this for openapi doc
+# oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login") # Commented out
 
 # New scheme for Bearer token input
 bearer_auth_scheme = APIKeyHeader(
