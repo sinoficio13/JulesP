@@ -1,5 +1,5 @@
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import OAuth2PasswordBearer, APIKeyHeader
 from pydantic import BaseModel, EmailStr, Field # Added Field
 import jwt # PyJWT or python-jose. Supabase uses standard JWTs.
 from typing import Optional, Dict, Any # Added Dict, Any
@@ -11,7 +11,14 @@ from supabase.lib.client_options import ClientOptions # Required for user_metada
 
 
 # This scheme can be used in swagger UI to make it easy to add the token
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login") # Points to our login endpoint
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login") # Keep this for openapi doc
+
+# New scheme for Bearer token input
+bearer_auth_scheme = APIKeyHeader(
+    name="Authorization",
+    description="Enter Bearer token in the format: **Bearer &lt;YOUR_TOKEN&gt;** (e.g., 'Bearer eyJ...')",
+    auto_error=True
+)
 
 class AuthenticatedUser(BaseModel):
     id: uuid.UUID
