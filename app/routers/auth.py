@@ -23,13 +23,13 @@ async def register_user(user_data: UserCreateAPI, supabase: Client = Depends(get
         if response.user and response.user.id:
             # User created, but might require email confirmation depending on Supabase settings
             if response.session: # Session is typically returned if email confirmation is off or auto-confirmed
-                 return AuthResponse(
+                 return AuthResponseAPI(
                     message="User registered successfully and logged in.",
                     user_id=str(response.user.id),
                     access_token=response.session.access_token
                 )
             else: # User created, but email confirmation might be pending
-                return AuthResponse(
+                return AuthResponseAPI(
                     message="User registered. Please check your email to confirm registration.",
                     user_id=str(response.user.id)
                 )
@@ -61,7 +61,7 @@ async def login_user(user_data: UserLoginAPI, supabase: Client = Depends(get_sup
         print(f"Supabase sign_in response: {response}")
 
         if response.session and response.session.user and response.session.access_token:
-            return AuthResponse(
+            return AuthResponseAPI(
                 message="User logged in successfully.",
                 user_id=str(response.session.user.id),
                 access_token=response.session.access_token
