@@ -58,9 +58,48 @@ El backend gestiona:
     - Edita el archivo `.env` y añade tus credenciales de Supabase y la API Key de Google Gemini:
       ```
       SUPABASE_URL="your_supabase_url_here"
-      SUPABASE_KEY="your_supabase_anon_or_service_key_here"
+      SUPABASE_KEY="your_supabase_anon_or_service_key_here" # Para operaciones básicas. Algunas funciones administrativas (ej. `supabase.auth.admin...`) pueden requerir la `service_role` key.
       GEMINI_API_KEY="your_gemini_api_key_here"
       ```
+
+## Prerrequisitos de Base de Datos (Supabase)
+
+Antes de ejecutar la aplicación y probar todas las funcionalidades, asegúrate de que las siguientes tablas existen en tu proyecto de Supabase:
+
+1.  **`auth.users`**: Creada automáticamente por Supabase Auth.
+
+2.  **`user_profiles`**:
+    *   `user_id` (UUID, Primary Key, Foreign Key a `auth.users.id`)
+    *   `objectives` (TEXT[]) - Array de strings
+    *   `experience_level` (TEXT)
+    *   `preferences` (JSONB)
+    *   `email` (TEXT, Opcional) - Puede ser útil para denormalizar o evitar uniones en algunos casos.
+    *   `created_at` (TIMESTAMPTZ, default `now()`)
+    *   `updated_at` (TIMESTAMPTZ, default `now()`)
+
+3.  **`medical_records`**:
+    *   `medical_record_id` (UUID, Primary Key, default `gen_random_uuid()`)
+    *   `user_id` (UUID, Foreign Key a `auth.users.id`)
+    *   `doctor_id` (UUID) - Identificador del médico. Podría ser FK a `auth.users.id` si los médicos son usuarios, o a una tabla `doctors`.
+    *   `conditions` (TEXT[])
+    *   `limitations` (TEXT[])
+    *   `recommendations` (TEXT)
+    *   `created_at` (TIMESTAMPTZ, default `now()`)
+    *   `updated_at` (TIMESTAMPTZ, default `now()`)
+
+4.  **`exercises`**:
+    *   `exercise_id` (UUID, Primary Key, default `gen_random_uuid()`)
+    *   `name` (TEXT, UNIQUE, NOT NULL)
+    *   `description` (TEXT)
+    *   `muscles_targeted` (TEXT[])
+    *   `equipment_needed` (TEXT[])
+    *   `precautions` (TEXT)
+    *   `image_url` (TEXT) - Debería ser una URL válida.
+    *   `video_url` (TEXT) - Debería ser una URL válida.
+    *   `created_at` (TIMESTAMPTZ, default `now()`)
+    *   `updated_at` (TIMESTAMPTZ, default `now()`)
+
+    **Importante**: Puebla la tabla `exercises` con algunos datos de ejemplo para que la generación de rutinas funcione correctamente.
 
 ## Ejecutar la Aplicación (Desarrollo Local)
 
@@ -79,6 +118,19 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 La API estará disponible en `http://localhost:8000`.
 La documentación interactiva de la API (Swagger UI) estará en `http://localhost:8000/docs`.
 La especificación OpenAPI estará en `http://localhost:8000/api/v1/openapi.json`.
+
+## Autenticación
+
+La API utiliza autenticación basada en tokens JWT proporcionados por Supabase.
+Después de registrarse o iniciar sesión a través de los endpoints `/api/v1/auth/register` o `/api/v1/auth/login`, recibirás un `access_token`.
+
+Para acceder a los endpoints protegidos, incluye este token en el header `Authorization` de tus peticiones:
+
+```
+Authorization: Bearer <TU_ACCESS_TOKEN_DE_SUPABASE>
+```
+
+La interfaz de `/docs` (Swagger UI) tiene un botón "Authorize" en la parte superior derecha donde puedes ingresar el token (incluyendo `Bearer `) para probar los endpoints protegidos directamente desde la documentación.
 
 ## Estructura del Proyecto (Backend)
 
@@ -112,10 +164,22 @@ La especificación OpenAPI estará en `http://localhost:8000/api/v1/openapi.json
 
 ## Próximos Pasos y TODOs
 
--   [ ] Implementar la lógica real de interacción con Supabase (reemplazar mocks).
--   [ ] Implementar la lógica real de llamadas a la API de Gemini (reemplazar mocks).
+-   [ ] Implementar la lógica real de llamadas a la API de Gemini (reemplazar mocks en `GeminiService`).
+-   [X] **Integración con Supabase (Datos)**:
+    -   [X] Cliente Supabase configurado.
+    -   [X] Autenticación integrada con Supabase Auth.
+    -   [X] Servicios de perfiles de usuario (`user_profiles`) integrados.
+    -   [X] Servicios de información médica (`medical_records`) integrados.
+    -   [X] Base de datos de ejercicios (`exercises`) integrada con los servicios.
+    -   [X] Servicios refactorizados para usar datos de Supabase en la preparación de prompts.
+-   [X] **Autenticación JWT**: Implementado un sistema de dependencias para validar JWT de Supabase y proteger endpoints.
+-   [ ] **Refinar Autorización**:
+    -   Implementar lógica para asegurar que solo los médicos puedan añadir/modificar información médica.
+    -   Asegurar que los usuarios solo puedan acceder/modificar sus propios datos (ej. perfil, solicitar rutina).
+    -   Actualizar todos los endpoints que toman `user_id` o `doctor_id` del path para usar el ID del token autenticado (ej. `/users/me/profile` en lugar de `/users/{user_id}/profile`).
+-   [ ] **Poblar la Base de Datos de Ejercicios**: Añadir un conjunto inicial y diverso de ejercicios en Supabase.
 -   [ ] Desarrollar tests unitarios e de integración.
--   [ ] Añadir manejo de errores más robusto.
--   [ ] Implementar autenticación y autorización completas con Supabase Auth.
--   [ ] Poblar la base de datos de ejercicios en Supabase.
--   [ ] Refinar los modelos Pydantic y la estructura de los prompts para Gemini.
+-   [ ] Añadir manejo de errores más robusto y validaciones detalladas.
+-   [ ] Configurar Row Level Security (RLS) en Supabase para una capa adicional de seguridad de datos.
+-   [ ] Considerar la paginación para endpoints que devuelven listas (ej. ejercicios, historial de rutinas).
+-   [ ] Implementar endpoints para gestionar la tabla `doctors` si es necesario (crear perfiles de doctor, etc.).
