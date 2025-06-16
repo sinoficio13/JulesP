@@ -1,7 +1,8 @@
 fastapi
 gunicorn
 uvicorn[standard]
-pydantic
+pydantic[email]
+pydantic-settings
 python-dotenv
-supabase-py
+supabase
 google-generativeai
