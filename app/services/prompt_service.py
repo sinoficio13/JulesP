@@ -142,14 +142,16 @@ class PromptPreparationService:
                     # Potentially add other top-level keys to the schema if desired, like "routine_name": "string"
                 }
             },
-            "request_specifics": { /* ... same as before ... */ }
-        }
-        # Copying the request_specifics from previous version for brevity
-        # prompt_data["output_format_instructions"] IS NOW DEFINED ABOVE
-        prompt_data["request_specifics"] = {
+            "request_specifics": {
                 "duration_weeks": 4,
                 "days_per_week": 3
             }
+        }
+        # No longer needed as it's defined inline above
+        # prompt_data["request_specifics"] = {
+        #         "duration_weeks": 4,
+        #         "days_per_week": 3
+        #     }
 
         print(f"PromptService: Gemini prompt fully prepared for user {user_id} using Supabase data.")
         return prompt_data
