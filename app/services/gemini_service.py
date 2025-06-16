@@ -1,10 +1,10 @@
 # In app/services/gemini_service.py
-from typing import Dict, Any, List # Added List
+from typing import Dict, Any, List, Optional # Optional moved here
 import json
 import os # Keep os for direct getenv if needed, though settings is preferred
 import google.generativeai as genai # Import the library
 from google.generativeai.types import GenerationConfig # For generation config
-from pydantic import BaseModel, ValidationError, Field, Optional # Added BaseModel, ValidationError, Field, Optional
+from pydantic import BaseModel, ValidationError, Field # Optional removed here
 from app.core.config import settings
 
 # --- Pydantic Models for Gemini Response Validation ---
