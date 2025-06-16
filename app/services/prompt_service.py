@@ -120,30 +120,32 @@ class PromptPreparationService:
                 "physician_recommendations": medical_info.get("recommendations")
             },
             "exercise_database": exercise_names,
-            "output_format_instructions": { /* ... same as before ... */ },
-            "request_specifics": { /* ... same as before ... */ }
-        }
-        # Copying the output_format_instructions and request_specifics from previous version for brevity
-        prompt_data["output_format_instructions"] = {
+            "output_format_instructions": {
+                "message": "IMPORTANT: Your response MUST be a single, valid JSON object that strictly adheres to the schema provided below. Do not include any explanatory text, comments, greetings, or any characters before or after the JSON object itself. The JSON object should represent the workout routine.",
                 "type": "JSON",
                 "schema": {
                     "days": [
                         {
-                            "day_of_week": "e.g., Monday",
-                            "focus": "e.g., Full Body Strength",
+                            "day_of_week": "string, e.g., Monday",
+                            "focus": "string, e.g., Full Body Strength",
                             "exercises": [
                                 {
-                                    "exercise_name": "Name of the exercise from exercise_database",
-                                    "sets": "Number of sets (e.g., 3)",
-                                    "reps": "Repetitions (e.g., '8-12' or 10)",
-                                    "rest_period_seconds": "Rest time in seconds (e.g., 60)",
-                                    "notes_specifics_ia": "Specific instructions or modifications from AI based on medical info/goals."
+                                    "exercise_name": "string, must be one of the names provided in the exercise_database",
+                                    "sets": "integer or string (e.g., 3 or 'AMRAP')",
+                                    "reps": "string (e.g., '8-12 reps' or '30 seconds')",
+                                    "rest_period_seconds": "integer, representing time in seconds (e.g., 60)",
+                                    "notes_specifics_ia": "string, specific instructions, modifications, or notes from AI based on user data and medical info."
                                 }
                             ]
                         }
                     ]
+                    # Potentially add other top-level keys to the schema if desired, like "routine_name": "string"
                 }
-            }
+            },
+            "request_specifics": { /* ... same as before ... */ }
+        }
+        # Copying the request_specifics from previous version for brevity
+        # prompt_data["output_format_instructions"] IS NOW DEFINED ABOVE
         prompt_data["request_specifics"] = {
                 "duration_weeks": 4,
                 "days_per_week": 3

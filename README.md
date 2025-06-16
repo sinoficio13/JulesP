@@ -7,7 +7,7 @@ Este repositorio contiene el backend para el Sistema de Rutinas de Gimnasio Pers
 El backend gestiona:
 - Autenticación de usuarios y médicos.
 - Recopilación y almacenamiento de datos de usuarios (objetivos, experiencia) e información médica.
-- Interacción con la API de Google Gemini para generar rutinas de entrenamiento personalizadas.
+- Interacción con la API de Google Gemini (utilizando la biblioteca cliente oficial `google-generativeai`) para generar rutinas de entrenamiento personalizadas.
 - Ensamblaje de rutinas con detalles de ejercicios (descripciones, URLs de medios, precauciones) desde la base de datos.
 - Provisión de una API RESTful para las aplicaciones frontend (web y móvil).
 
@@ -18,7 +18,7 @@ El backend gestiona:
 - **Servidor ASGI**: Uvicorn
 - **Validación de Datos**: Pydantic
 - **Base de Datos**: PostgreSQL (a través de Supabase)
-- **IA**: Google Gemini API
+- **IA**: Google Gemini API (via `google-generativeai` library)
 - **Gestión de Entorno**: python-dotenv
 
 ## Configuración del Entorno
@@ -164,7 +164,11 @@ La interfaz de `/docs` (Swagger UI) tiene un botón "Authorize" en la parte supe
 
 ## Próximos Pasos y TODOs
 
--   [ ] Implementar la lógica real de llamadas a la API de Gemini (reemplazar mocks en `GeminiService`).
+-   [X] **Integración con Gemini API**:
+    -   [X] Instalada la biblioteca `google-generativeai`.
+    -   [X] Configurado el cliente de Gemini API en `GeminiService`.
+    -   [X] Implementada la llamada real a la API de Gemini, con parseo y validación Pydantic de la respuesta JSON.
+    -   [ ] Refinar continuamente el prompt de Gemini y el manejo de errores/calidad de la respuesta basado en pruebas exhaustivas.
 -   [X] **Integración con Supabase (Datos)**:
     -   [X] Cliente Supabase configurado.
     -   [X] Autenticación integrada con Supabase Auth.

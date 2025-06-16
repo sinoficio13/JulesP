@@ -1,142 +1,119 @@
-from typing import Dict, Any
+# In app/services/gemini_service.py
+from typing import Dict, Any, List # Added List
 import json
-import os
-# from google.generativeai import GenerativeModel # Or your chosen Gemini SDK
-# from app.core.config import settings # For API Key
+import os # Keep os for direct getenv if needed, though settings is preferred
+import google.generativeai as genai # Import the library
+from google.generativeai.types import GenerationConfig # For generation config
+from pydantic import BaseModel, ValidationError, Field, Optional # Added BaseModel, ValidationError, Field, Optional
+from app.core.config import settings
+
+# --- Pydantic Models for Gemini Response Validation ---
+class GeminiExercise(BaseModel):
+    exercise_name: str
+    sets: Any # Can be int or str like "3" or "As prescribed"
+    reps: Any # Can be str like "8-12" or int like 10
+    rest_period_seconds: Any # Often int, but AI might return string
+    notes_specifics_ia: Optional[str] = None
+
+class GeminiDailyRoutine(BaseModel):
+    day_of_week: str
+    focus: Optional[str] = None
+    exercises: List[GeminiExercise]
+
+class GeminiRoutineResponse(BaseModel):
+    days: List[GeminiDailyRoutine]
+    # Potentially other top-level fields if requested from Gemini
+    # routine_name: Optional[str] = None
+# --- End Pydantic Models ---
 
 class GeminiService:
     def __init__(self):
-        # In a real scenario, initialize the Gemini client
-        # self.api_key = settings.GEMINI_API_KEY
-        # or os.getenv("GEMINI_API_KEY")
-        # if not self.api_key:
-        #     raise ValueError("GEMINI_API_KEY not found in environment or settings.")
-        # self.model = GenerativeModel("gemini-pro") # Or the specific model version
-        print("GeminiService initialized (mocked).")
+        self.api_key = settings.GEMINI_API_KEY
+        self.model = None
+        self.generation_config = GenerationConfig(
+            # Ensure Gemini attempts to output JSON if the model supports it explicitly
+            # For some models, you might specify response_mime_type="application/json"
+            # Temperature, top_k, top_p can also be set here.
+            # Let's keep it simple for now.
+            temperature=0.7 # Example temperature
+        )
+
+
+        if not self.api_key:
+            print("Warning: GEMINI_API_KEY not found. GeminiService will not be functional for real calls.")
+        else:
+            try:
+                genai.configure(api_key=self.api_key)
+                self.model = genai.GenerativeModel(
+                    model_name='gemini-pro', # Or 'gemini-1.5-flash', 'gemini-1.5-pro' etc.
+                    generation_config=self.generation_config
+                )
+                print("GeminiService initialized successfully with GenerativeModel and generation_config.")
+            except Exception as e:
+                print(f"Error initializing Gemini GenerativeModel: {e}")
+
+        if not self.model:
+             print("GeminiService: Model not initialized. Calls to generate_routine will fail if mock is removed.")
 
     async def generate_routine(self, prompt_data: Dict[str, Any]) -> Dict[str, Any]:
-        print(f"GeminiService: Received prompt data for routine generation (mocked): {json.dumps(prompt_data, indent=2)}")
+        if not self.model:
+            print("GeminiService: Model not available. Cannot make API call.")
+            # Depending on desired behavior, either raise an error or return a fallback.
+            # For now, let's raise an error if the model isn't configured for a real call.
+            raise RuntimeError("GeminiService model is not configured. Check API key and initialization.")
 
-        # Mocked Gemini API call
-        # In a real implementation:
-        # try:
-        #     response = await self.model.generate_content_async(json.dumps(prompt_data)) # Ensure prompt is in correct format for API
-        #     # Process response.text or response.parts to get the JSON output
-        #     # Handle potential errors, rate limits, etc.
-        #     if response.candidates and response.candidates[0].content.parts:
-        #         generated_json_str = response.candidates[0].content.parts[0].text
-        #         # It's crucial that Gemini returns a valid JSON string as requested in the prompt.
-        #         # Add validation here if necessary.
-        #         return json.loads(generated_json_str)
-        #     else:
-        #         # Handle cases where the response might be empty or not as expected
-        #         print("GeminiService: Warning - Gemini response was empty or not in expected format.")
-        #         raise ValueError("Failed to generate routine from Gemini: Empty or invalid response.")
-        # except Exception as e:
-        #     print(f"GeminiService: Error during API call - {e}")
-        #     raise # Re-raise the exception or handle it as appropriate
+        print(f"GeminiService: Sending prompt to Gemini API. Prompt type: {type(prompt_data)}")
+        # The prompt_data is a Python dict. The google-generativeai library typically handles
+        # serialization of dicts/lists of Parts. We need to ensure our prompt_data is structured
+        # as a valid "Content" part for the API. Usually, just passing the dict works if it's simple text,
+        # or a list of parts if it's more complex (e.g. multimodal).
+        # Our prompt is a complex JSON structure. We should send it as a single text block that is a JSON string.
 
-        # For now, return a predefined mock JSON response that matches the expected output format
-        mock_routine = {
-            "days": [
-                {
-                    "day_of_week": "Monday",
-                    "focus": "Full Body Strength (Mock)",
-                    "exercises": [
-                        {
-                            "exercise_name": "Squat",
-                            "sets": 3,
-                            "reps": "8-12",
-                            "rest_period_seconds": 60,
-                            "notes_specifics_ia": "Focus on depth and form, ensure knees track over toes. Mocked IA note."
-                        },
-                        {
-                            "exercise_name": "Bench Press",
-                            "sets": 3,
-                            "reps": "8-12",
-                            "rest_period_seconds": 60,
-                            "notes_specifics_ia": "Keep shoulders retracted and engage chest. Mocked IA note."
-                        },
-                        {
-                            "exercise_name": "Pull Up",
-                            "sets": 3,
-                            "reps": "As many as possible (AMRAP)",
-                            "rest_period_seconds": 90,
-                            "notes_specifics_ia": "Use assistance if needed, focus on full range of motion. Mocked IA note."
-                        }
-                    ]
-                },
-                {
-                    "day_of_week": "Wednesday",
-                    "focus": "Lower Body & Core (Mock)",
-                    "exercises": [
-                        {
-                            "exercise_name": "Deadlift",
-                            "sets": 1, # Often lower sets for deadlifts, esp. for some experience levels
-                            "reps": "5",
-                            "rest_period_seconds": 120,
-                            "notes_specifics_ia": "Maintain neutral spine. Very important. If hypertensive, consult doctor. Mocked IA note."
-                        },
-                        {
-                            "exercise_name": "Leg Press",
-                            "sets": 3,
-                            "reps": "10-15",
-                            "rest_period_seconds": 75,
-                            "notes_specifics_ia": "Control the eccentric phase. Mocked IA note."
-                        },
-                        {
-                            "exercise_name": "Plank",
-                            "sets": 3,
-                            "reps": "Hold for 30-60 seconds",
-                            "rest_period_seconds": 45,
-                            "notes_specifics_ia": "Engage core, avoid hip sag. Mocked IA note."
-                        }
-                    ]
-                },
-                {
-                    "day_of_week": "Friday",
-                    "focus": "Upper Body & Accessories (Mock)",
-                    "exercises": [
-                        {
-                            "exercise_name": "Overhead Press (Dumbbell)",
-                            "sets": 3,
-                            "reps": "10-12",
-                            "rest_period_seconds": 60,
-                            "notes_specifics_ia": "Avoid if recent shoulder strain without clearance. Mocked IA note."
-                        },
-                        {
-                            "exercise_name": "Bicep Curl",
-                            "sets": 3,
-                            "reps": "10-15",
-                            "rest_period_seconds": 45,
-                            "notes_specifics_ia": "Keep elbows stable. Mocked IA note."
-                        },
-                        {
-                            "exercise_name": "Tricep Extension",
-                            "sets": 3,
-                            "reps": "10-15",
-                            "rest_period_seconds": 45,
-                            "notes_specifics_ia": "Focus on tricep contraction. Mocked IA note."
-                        }
-                    ]
-                }
-            ]
-        }
-        print("GeminiService: Returning mocked routine.")
-        return mock_routine
+        prompt_json_string = json.dumps(prompt_data)
 
-# Example usage (for testing purposes)
-# if __name__ == "__main__":
-#     import asyncio
-#     async def main_test():
-#         service = GeminiService()
-#         # Create a dummy prompt similar to what PromptPreparationService would generate
-#         dummy_prompt = {
-#             "user_profile": {"goals": ["strength"], "experience_level": "intermediate"},
-#             "medical_information": {"limitations": ["avoid high impact"]},
-#             "exercise_database": ["Squat", "Bench Press", "Deadlift", "Overhead Press (Dumbbell)", "Pull Up", "Plank", "Bicep Curl", "Tricep Extension"],
-#             "output_format_instructions": {"type": "JSON", "schema": {}} # Simplified for this test
-#         }
-#         routine = await service.generate_routine(dummy_prompt)
-#         print(json.dumps(routine, indent=2))
-#     asyncio.run(main_test())
+        try:
+            print(f"GeminiService: Attempting to generate content with Gemini. Prompt length: {len(prompt_json_string)}")
+            # print(f"First 500 chars of prompt sent to Gemini: {prompt_json_string[:500]}") # For debugging
+
+            # response = await self.model.generate_content_async(prompt_data) # If library handles dict directly
+            response = await self.model.generate_content_async(prompt_json_string) # Sending JSON string
+
+            # Debug: Print the raw response text
+            # print(f"Gemini RAW response text: {response.text}")
+
+            # Gemini's response.text should be the JSON string we asked for.
+            # It's crucial that the prompt clearly instructs Gemini to return a JSON.
+            if not response.text:
+                print("GeminiService Error: Received empty response text from API.")
+                raise ValueError("Gemini API returned an empty response.")
+
+            # Parse the JSON string from Gemini's response
+            try:
+                generated_routine_dict = json.loads(response.text)
+            except json.JSONDecodeError as e:
+                print(f"GeminiService Error: Failed to decode JSON from Gemini response. Error: {e}")
+                print(f"Gemini response text that failed parsing: {response.text}")
+                raise ValueError(f"Invalid JSON response from Gemini: {e}")
+
+            # Validate the structure of the parsed dictionary using Pydantic
+            try:
+                validated_response = GeminiRoutineResponse(**generated_routine_dict)
+                print("GeminiService: Successfully generated and validated routine from Gemini.")
+                return validated_response.model_dump() # Return as dict
+            except ValidationError as e:
+                print(f"GeminiService Error: Gemini response failed Pydantic validation. Errors: {e.errors()}")
+                print(f"Data that failed validation: {generated_routine_dict}")
+                # Optionally, you could try to salvage parts of the data or return a specific error structure
+                raise ValueError(f"Gemini response structure validation failed: {e.errors()}")
+
+        except Exception as e:
+            # This catches errors from generate_content_async (e.g., API errors, network issues)
+            # or errors raised from our handling above.
+            print(f"GeminiService Error: An exception occurred during Gemini API call or response processing: {e}")
+            # Consider specific error types from google.generativeai.types.generation_types if needed
+            # e.g., BlockedPromptException, StopCandidateException
+            # from google.generativeai.types import BlockedPromptException (or similar, check specific library version)
+            # if isinstance(e, BlockedPromptException):
+            #     print(f"Gemini prompt was blocked. Reason: {e}") # Access specific attributes of the exception
+            #     raise ValueError(f"Prompt blocked by Gemini: {e}")
+            raise RuntimeError(f"Failed to generate routine via Gemini: {str(e)}")
