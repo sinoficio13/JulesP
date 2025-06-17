@@ -14,7 +14,6 @@ from app.services.routine_service import RoutineAssemblyService
 
 
 router = APIRouter(
-    prefix="/users",
     tags=["users"]
 )
 

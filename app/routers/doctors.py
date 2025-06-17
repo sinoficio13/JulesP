@@ -8,7 +8,6 @@ from supabase import Client
 from app.models.user import MedicalInfoDB, MedicalInfoCreate # MedicalInfoUpdate is defined but not used yet
 
 router = APIRouter(
-    prefix="/doctors",
     tags=["doctors"]
 )
 
