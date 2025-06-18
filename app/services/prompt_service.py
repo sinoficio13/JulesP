@@ -40,55 +40,38 @@ class PromptPreparationService:
 
     async def _get_medical_info(self, user_id: uuid.UUID, supabase: Client) -> Dict[str, Any]:
         print(f"PromptService: Fetching medical info for user {user_id} from Supabase")
+        default_medical_info = {"conditions": [], "limitations": [], "recommendations": ""}
         try:
-            # Fetch latest medical record for the user.
-            # Assuming MedicalInfoDB model fields: conditions, limitations, recommendations
-            # If multiple records exist, logic to pick the "active" or "latest" one might be needed.
-            # For now, let's assume we take the most recent one if a 'created_at' field exists and is maintained.
-            # Or, if only one record is expected per user from the doctors' endpoint, a simple select is fine.
-            # The current doctors.py GET returns a list, so let's fetch all and potentially process.
-            # For the prompt, we probably want a consolidated view or the most relevant.
-            # Let's assume for now we take the first record if multiple exist, or an empty dict if none.
+            response = supabase.table("medical_records").select("conditions, limitations, recommendations").eq("user_id", str(user_id)).execute()
 
-            # Fetch all records for the user (as GET in doctors.py returns List[MedicalInfoDB])
-            response = supabase.table("medical_records").select("conditions, limitations, recommendations").eq("user_id", str(user_id)).execute() # order by created_at desc if available
-
-            if response.data:
-                # For the prompt, we need a single consolidated record.
-                # This example takes the first record found. More sophisticated merging or selection might be needed.
-                # E.g., concatenating all conditions/limitations from multiple records.
-                # For simplicity, using the first record:
+            if response.data: # If data is a non-empty list
+                # Assuming we use the first record if multiple exist, as before.
+                # More sophisticated merging could be added if needed.
                 first_record = response.data[0]
                 return {
-                    "conditions": first_record.get("conditions"),
-                    "limitations": first_record.get("limitations"),
-                    "recommendations": first_record.get("recommendations")
+                    "conditions": first_record.get("conditions", []), # Default to empty list if key missing
+                    "limitations": first_record.get("limitations", []), # Default to empty list
+                    "recommendations": first_record.get("recommendations", "") # Default to empty string
                 }
-            elif response.error:
-                print(f"Supabase error fetching medical info for {user_id}: {response.error.message}")
-                # Return empty/default rather than failing prompt generation
-                return {"conditions": [], "limitations": [], "recommendations": ""}
-            else: # No data, no error
+            else: # No data found (response.data is empty list or None)
                 print(f"PromptService: No medical records found for user {user_id}.")
-                return {"conditions": [], "limitations": [], "recommendations": ""}
+                return default_medical_info
         except Exception as e:
-            print(f"Exception fetching medical info for {user_id}: {e}")
-            # Return empty/default values
-            return {"conditions": [], "limitations": [], "recommendations": ""}
+            # This will catch actual errors from supabase-py (network, DB error, permissions if not caught by RLS as expected)
+            print(f"Exception fetching medical info for {user_id}: {type(e).__name__} - {str(e)}")
+            return default_medical_info
 
     async def _get_available_exercises(self, supabase: Client) -> List[Dict[str, Any]]:
-        # This method is already updated to use Supabase, keep as is.
         print("PromptService: Fetching available exercises from Supabase")
         try:
-            response = supabase.table("exercises").select("name").execute()
-            if response.data:
+            response = supabase.table("exercises").select("name").execute() # Fetches [{"name": "Squat"}, ...]
+            if response.data: # If data is a non-empty list
                 return response.data
-            elif response.error:
-                print(f"Supabase error fetching exercises: {response.error}")
+            else: # No data found
+                print("PromptService: No exercises found in the database.")
                 return []
-            return []
         except Exception as e:
-            print(f"Exception fetching exercises from Supabase: {e}")
+            print(f"Exception fetching exercises from Supabase: {type(e).__name__} - {str(e)}")
             return []
 
     async def prepare_gemini_prompt(self, user_id: uuid.UUID) -> Dict[str, Any]:
