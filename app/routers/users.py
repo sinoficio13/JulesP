@@ -45,7 +45,7 @@ async def create_or_update_my_user_profile( # Renamed function
 
         if response.data:
             # Email is already in current_user.email from token
-            return UserProfileDB(**response.data[0], email=current_user.email)
+            return UserProfileDB(**response.data[0])
         elif response.error:
             print(f"Supabase error: {response.error}")
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=response.error.message)
@@ -76,7 +76,7 @@ async def get_my_user_profile(
         print(f"DEBUG: Supabase select response for user_profiles: {profile_response}") # Debug response
 
         if profile_response.data:
-            return UserProfileDB(**profile_response.data, email=current_user.email)
+            return UserProfileDB(**profile_response.data)
 
         # Handling cases where .single() might not find data or errors occur
         # (though .single() usually errors if not exactly one row, or data is None if maybe_single())
