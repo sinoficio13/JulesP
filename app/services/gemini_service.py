@@ -45,7 +45,7 @@ class GeminiService:
             try:
                 genai.configure(api_key=self.api_key)
                 self.model = genai.GenerativeModel(
-                    model_name='gemini-1.0-pro', # Changed model name
+                    model_name='gemini-1.5-flash-latest', # Changed model name
                     generation_config=self.generation_config
                 )
                 print("GeminiService initialized successfully with GenerativeModel and generation_config.")
