@@ -1,3 +1,6 @@
+# At the top of app/routers/users.py
+import traceback
+# ... other imports like fastapi, uuid, etc. ...
 from fastapi import APIRouter, HTTPException, status, Depends # Removed Path as it's no longer used for user_id
 from typing import List, Optional # Keep these
 import uuid
@@ -67,20 +70,48 @@ async def get_my_user_profile(
     user_id = current_user.id
     print(f"Attempting to retrieve profile for authenticated user_id: {user_id}")
     try:
+        # This is the block we are wrapping
+        print(f"DEBUG: Supabase client object in get_my_user_profile: {supabase}") # Debug client
         profile_response = supabase.table("user_profiles").select("*").eq("user_id", str(user_id)).single().execute()
+        print(f"DEBUG: Supabase select response for user_profiles: {profile_response}") # Debug response
 
         if profile_response.data:
-            return UserProfileDB(**profile_response.data, email=current_user.email) # Email from token
-        elif profile_response.error and "PGRST116" in profile_response.error.message:
+            return UserProfileDB(**profile_response.data, email=current_user.email)
+
+        # Handling cases where .single() might not find data or errors occur
+        # (though .single() usually errors if not exactly one row, or data is None if maybe_single())
+        # The supabase-py library might raise specific exceptions for "not found" with .single()
+        # or if response.error has content.
+
+        # Check for explicit error in response, even if no exception was raised by .execute()
+        if profile_response.error:
+            print(f"!!!! DATABASE QUERY ERROR (Supabase response.error) !!!!")
+            print(f"Error type: PostgrestAPIError (presumed)") # Or whatever type it is
+            print(f"Error details: {profile_response.error.message}")
+            print(f"Error code: {profile_response.error.code}")
+            print(f"Error hint: {profile_response.error.hint}")
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Database query error: {profile_response.error.message}")
+
+        # If no data and no explicit error, it implies .single() didn't find the row.
+        # This should ideally be caught by specific exceptions if the library raises them,
+        # but as a fallback:
+        if not profile_response.data:
+             print(f"!!!! DATABASE QUERY NO DATA !!!! Profile not found for user {user_id} (PGRST116 expected if .single() fails to find).")
              raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Profile not found for user {user_id}.")
-        elif profile_response.error:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=profile_response.error.message)
-        else:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Profile not found for user {user_id}.")
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+        # This part should ideally not be reached if the above conditions cover all scenarios
+        # or if supabase-py raises exceptions for errors from .single().execute()
+        # For safety, keeping a generic 404 if somehow we get here with no data.
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Profile not found for user {user_id} (unexpected state).")
+
+    except HTTPException as e_http: # Re-raise HTTPExceptions we've thrown
+        raise e_http
+    except Exception as e: # Catch any other exceptions (from Supabase client, Pydantic, etc.)
+        print(f"!!!! DATABASE QUERY FAILED (General Exception) !!!!")
+        print(f"Error type: {type(e).__name__}")
+        print(f"Error details: {str(e)}")
+        print(f"Full traceback: {traceback.format_exc()}") # This will print the full traceback to console
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Database error: {type(e).__name__} - Check server logs for traceback.")
 
 
 @router.post("/me/generate-routine", response_model=FullRoutineDetail) # Changed path
