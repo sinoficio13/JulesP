@@ -88,24 +88,22 @@ class GeminiService:
                 print("GeminiService Error: Received empty response text from API.")
                 raise ValueError("Gemini API returned an empty response.")
 
-            print(f"DEBUG: Raw response text from Gemini: {raw_text[:500]}...") # Log a snippet of raw response
+            print(f"DEBUG: Raw response text from Gemini (length {len(raw_text)}): {raw_text[:500]}...")
 
-            cleaned_text = raw_text
-            # Remove potential "```json" prefix
-            if cleaned_text.startswith("```json"):
+            # Improved cleaning logic
+            cleaned_text = raw_text.strip() # 1. Strip leading/trailing whitespace (like newlines around ```json)
+
+            if cleaned_text.startswith("```json"): # 2. Check for ```json prefix
                 cleaned_text = cleaned_text[len("```json"):]
-            # Remove potential "```" prefix (if "json" part was missing)
-            elif cleaned_text.startswith("```"):
+            elif cleaned_text.startswith("```"): # 3. Else, check for ``` prefix
                 cleaned_text = cleaned_text[len("```"):]
 
-            # Remove potential "```" suffix
-            if cleaned_text.endswith("```"):
+            if cleaned_text.endswith("```"): # 4. Check for ``` suffix
                 cleaned_text = cleaned_text[:-len("```")]
 
-            cleaned_text = cleaned_text.strip() # Remove leading/trailing whitespace
+            cleaned_text = cleaned_text.strip() # 5. Strip again to remove any newlines/spaces left after removing markers
 
-            print(f"DEBUG: Cleaned text for JSON parsing: {cleaned_text[:500]}...") # Log a snippet of cleaned response
-
+            print(f"DEBUG: Cleaned text for JSON parsing (length {len(cleaned_text)}): {cleaned_text[:500]}...")
 
             # Parse the CLEANED JSON string
             try:
