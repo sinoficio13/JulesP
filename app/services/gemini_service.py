@@ -83,17 +83,38 @@ class GeminiService:
 
             # Gemini's response.text should be the JSON string we asked for.
             # It's crucial that the prompt clearly instructs Gemini to return a JSON.
-            if not response.text:
+            raw_text = response.text # Store raw response for potential logging
+            if not raw_text:
                 print("GeminiService Error: Received empty response text from API.")
                 raise ValueError("Gemini API returned an empty response.")
 
-            # Parse the JSON string from Gemini's response
+            print(f"DEBUG: Raw response text from Gemini: {raw_text[:500]}...") # Log a snippet of raw response
+
+            cleaned_text = raw_text
+            # Remove potential "```json" prefix
+            if cleaned_text.startswith("```json"):
+                cleaned_text = cleaned_text[len("```json"):]
+            # Remove potential "```" prefix (if "json" part was missing)
+            elif cleaned_text.startswith("```"):
+                cleaned_text = cleaned_text[len("```"):]
+
+            # Remove potential "```" suffix
+            if cleaned_text.endswith("```"):
+                cleaned_text = cleaned_text[:-len("```")]
+
+            cleaned_text = cleaned_text.strip() # Remove leading/trailing whitespace
+
+            print(f"DEBUG: Cleaned text for JSON parsing: {cleaned_text[:500]}...") # Log a snippet of cleaned response
+
+
+            # Parse the CLEANED JSON string
             try:
-                generated_routine_dict = json.loads(response.text)
+                generated_routine_dict = json.loads(cleaned_text) # Use cleaned_text
             except json.JSONDecodeError as e:
                 print(f"GeminiService Error: Failed to decode JSON from Gemini response. Error: {e}")
-                print(f"Gemini response text that failed parsing: {response.text}")
-                raise ValueError(f"Invalid JSON response from Gemini: {e}")
+                print(f"Gemini RAW response text was: {raw_text}") # Log original raw text
+                print(f"Gemini CLEANED response text that failed parsing: {cleaned_text}") # Log cleaned text
+                raise ValueError(f"Invalid JSON response from Gemini after cleaning: {e}")
 
             # Validate the structure of the parsed dictionary using Pydantic
             try:
