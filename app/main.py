@@ -15,7 +15,7 @@ OPENAPI_COMPONENTS = {
                               # 'apiKey' suele dar la UI más simple en Swagger para pegar un token.
             "name": "Authorization", # El nombre del header
             "in": "header",          # Dónde se encuentra la "API key" (en este caso, el token)
-            "description": "Enter token in the format: **Bearer &lt;YOUR_TOKEN&gt;** (e.g., 'Bearer eyJ...')"
+            "description": "Enter your JWT token prefixed with 'Bearer '. Example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c. **The 'Bearer ' prefix (with a space) is required.**"
         }
         # Podríamos también definir el oauth2_scheme aquí si quisiéramos que apareciera
         # explícitamente como una opción separada en la documentación, pero para simplificar
